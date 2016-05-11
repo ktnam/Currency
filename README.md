@@ -102,3 +102,4 @@ echo Currency::rounded(12.80, 0, 'USD');
 ~~~
 
 ## Change Log
+- Added option to update using Bank of China (BOC) exchange rates
