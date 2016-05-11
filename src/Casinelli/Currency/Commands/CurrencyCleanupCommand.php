@@ -2,8 +2,8 @@
 
 namespace Casinelli\Currency\Commands;
 
-use Illuminate\Console\Command;
 use Cache;
+use Illuminate\Console\Command;
 
 class CurrencyCleanupCommand extends Command
 {

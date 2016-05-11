@@ -19,11 +19,11 @@ class CurrencyServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->publishes([
-            __DIR__.'/../../config/currency.php' => config_path('currency.php'),
+            __DIR__ . '/../../config/currency.php' => config_path('currency.php'),
         ], 'config');
 
         $this->publishes([
-            __DIR__.'/../../migrations' => base_path('/database/migrations'),
+            __DIR__ . '/../../migrations' => base_path('/database/migrations'),
         ], 'migrations');
     }
 
@@ -32,7 +32,7 @@ class CurrencyServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->mergeConfigFrom(__DIR__.'/../../config/currency.php', 'currency');
+        $this->mergeConfigFrom(__DIR__ . '/../../config/currency.php', 'currency');
 
         // Register providers.
         $this->registerCurrency();
