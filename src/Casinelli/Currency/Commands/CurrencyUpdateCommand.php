@@ -184,8 +184,9 @@ class CurrencyUpdateCommand extends Command
             $opts = explode(';', $opts); //0=CURLOPT_CONNECTTIMEOUT=20, 1=CURLOPT_MAXREDIRS=2
             foreach ($opts as $opt) {
                 $arr = explode('=', $opt); //0=CURLOPT_CONNECTTIMEOUT, 1=20
-                if (isset($arr[1]))
-                    curl_setopt($ch, $arr[0], $arr[1]);
+                if (isset($arr[1]) && defined($arr[0])) {
+                    curl_setopt($ch, constant($arr[0]), $arr[1]);
+                }
             }
         }
 
