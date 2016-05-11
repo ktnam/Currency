@@ -64,13 +64,16 @@ return [
 
     'boc_url' => 'http://www.boc.cn/sourcedb/whpj/enindex.html',
 
-    'boc_unit' => 100,
+    'boc_unit'  => 100,
 
     /*
      |--------------------------------------------------------------------------
-     | HTTP proxy to tunnel requests through
+     | Curl Options
      |--------------------------------------------------------------------------
+     | Semicolon separated values
+     |
+     | e.g.: CURLOPT_CONNECTTIMEOUT=20;CURLOPT_MAXREDIRS=2;CURLOPT_MAXCONNECTS=2;
      */
-    'proxy'    => env('CURRENCY_PROXY'),
+    'curl_opts' => env('CURRENCY_CURL_OPTS'),
 
 ];

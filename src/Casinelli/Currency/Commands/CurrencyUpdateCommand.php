@@ -48,7 +48,6 @@ class CurrencyUpdateCommand extends Command
     public function __construct($app)
     {
         $this->app = $app;
-        $this->proxy = $app['config']['currency.proxy'];
         parent::__construct();
     }
 
@@ -166,7 +165,7 @@ class CurrencyUpdateCommand extends Command
         $this->info('Updated!');
     }
 
-    private function request($url, $opts = [])
+    private function request($url)
     {
         $ch = curl_init($url);
 
@@ -179,16 +178,16 @@ class CurrencyUpdateCommand extends Command
         curl_setopt($ch, CURLOPT_MAXCONNECTS, 2);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 
-        //proxy
-        if ($proxy = $this->proxy)
-            curl_setopt_array($ch, [
-                CURLOPT_PROXY           => $proxy,
-                CURLOPT_HTTPPROXYTUNNEL => 1,
-            ]);
-
-        //custom options
-        if ($opts)
-            curl_setopt_array($ch, $opts);
+        //Custom options
+        $opts = $this->app['config']['currency.curl_opts']; //CURLOPT_CONNECTTIMEOUT=20;CURLOPT_MAXREDIRS=2;
+        if ($opts) {
+            $opts = explode(';', $opts); //0=CURLOPT_CONNECTTIMEOUT=20, 1=CURLOPT_MAXREDIRS=2
+            foreach ($opts as $opt) {
+                $arr = explode('=', $opt); //0=CURLOPT_CONNECTTIMEOUT, 1=20
+                if (isset($arr[1]))
+                    curl_setopt($ch, $arr[0], $arr[1]);
+            }
+        }
 
         $response = curl_exec($ch);
         $error = $response ?: curl_error($ch);
