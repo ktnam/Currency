@@ -3,9 +3,10 @@
 namespace Casinelli\Currency;
 
 use Cache;
-use Input;
 use Cookie;
+use Input;
 use Session;
+use Casinelli\Currency\Entities\Currency as CurrencyEntity;
 
 class Currency
 {
@@ -45,11 +46,14 @@ class Currency
         // Check for a user defined currency
         if (Input::get('currency') && array_key_exists(Input::get('currency'), $this->currencies)) {
             $this->setCurrency(Input::get('currency'));
-        } elseif (Session::get('currency') && array_key_exists(Session::get('currency'), $this->currencies)) {
+        }
+        elseif (Session::get('currency') && array_key_exists(Session::get('currency'), $this->currencies)) {
             $this->setCurrency(Session::get('currency'));
-        } elseif (Cookie::get('currency') && array_key_exists(Cookie::get('currency'), $this->currencies)) {
+        }
+        elseif (Cookie::get('currency') && array_key_exists(Cookie::get('currency'), $this->currencies)) {
             $this->setCurrency(Cookie::get('currency'));
-        } else {
+        }
+        else {
             $this->setCurrency($this->app['config']['currency.default']);
         }
     }
@@ -71,10 +75,12 @@ class Currency
         if ($value = $this->currencies[$currency]['value']) {
             if ($inverse) {
                 $value = $number * (1 / $value);
-            } else {
+            }
+            else {
                 $value = $number * $value;
             }
-        } else {
+        }
+        else {
             $value = $number;
         }
 
@@ -92,30 +98,32 @@ class Currency
             case 'ceil':
             case 'ceiling':
                 if ($precision != null) {
-                    $multiplier = pow(10, -(int) $precision);
-                } else {
-                    $multiplier = pow(10, -(int) $decimalPlace);
+                    $multiplier = pow(10, -(int)$precision);
+                }
+                else {
+                    $multiplier = pow(10, -(int)$decimalPlace);
                 }
 
-                $string .= number_format(ceil($value / $multiplier) * $multiplier, (int) $decimalPlace, $decimalPoint, $thousandPoint);
+                $string .= number_format(ceil($value / $multiplier) * $multiplier, (int)$decimalPlace, $decimalPoint, $thousandPoint);
                 break;
 
             case 'floor':
                 if ($precision != null) {
-                    $multiplier = pow(10, -(int) $precision);
-                } else {
-                    $multiplier = pow(10, -(int) $decimalPlace);
+                    $multiplier = pow(10, -(int)$precision);
+                }
+                else {
+                    $multiplier = pow(10, -(int)$decimalPlace);
                 }
 
-                $string .= number_format(floor($value / $multiplier) * $multiplier, (int) $decimalPlace, $decimalPoint, $thousandPoint);
+                $string .= number_format(floor($value / $multiplier) * $multiplier, (int)$decimalPlace, $decimalPoint, $thousandPoint);
                 break;
 
             default:
                 if ($precision == null) {
-                    $precision = (int) $decimalPlace;
+                    $precision = (int)$decimalPlace;
                 }
 
-                $string .= number_format(round($value, (int) $precision), (int) $decimalPlace, $decimalPoint, $thousandPoint);
+                $string .= number_format(round($value, (int)$precision), (int)$decimalPlace, $decimalPoint, $thousandPoint);
                 break;
         }
 
@@ -136,7 +144,8 @@ class Currency
 
         if ($value) {
             $value = $number * $value;
-        } else {
+        }
+        else {
             $value = $number;
         }
 
@@ -144,7 +153,7 @@ class Currency
             $dec = $this->currencies[$this->code]['decimal_place'];
         }
 
-        return number_format(round($value, (int) $dec), (int) $dec, '.', '');
+        return number_format(round($value, (int)$dec), (int)$dec, '.', '');
     }
 
     public function rounded($number, $decimalPlace = 0, $currency = null)
@@ -201,7 +210,8 @@ class Currency
     {
         if ($currency && $this->hasCurrency($currency)) {
             return $this->currencies[$currency];
-        } else {
+        }
+        else {
             return $this->currencies[$this->code];
         }
     }
@@ -227,7 +237,8 @@ class Currency
             }
             $decimalPoint = $this->currencies[$currency]['decimal_point'];
             $thousandPoint = $this->currencies[$currency]['thousand_point'];
-        } else {
+        }
+        else {
             $symbolLeft = $this->currencies[$this->code]['symbol_left'];
             $symbolRight = $this->currencies[$this->code]['symbol_right'];
             if (is_null($decimalPlace)) {
@@ -251,9 +262,9 @@ class Currency
             }
         }
 
-        $precision = (int) $decimalPlace;
+        $precision = (int)$decimalPlace;
 
-        $string .= number_format(round($value, (int) $precision), (int) $decimalPlace, $decimalPoint, $thousandPoint);
+        $string .= number_format(round($value, (int)$precision), (int)$decimalPlace, $decimalPoint, $thousandPoint);
 
         if ($symbolRight) {
             if ($this->app['config']['currency.use_space']) {
@@ -275,19 +286,18 @@ class Currency
 
         $this->currencies = Cache::rememberForever('casinelli.currency', function () use ($db) {
             $cache = [];
-            $tableName = $this->app['config']['currency.table_name'];
 
-            foreach ($db->table($tableName)->get() as $currency) {
+            foreach (CurrencyEntity::all() as $currency) {
                 $cache[$currency->code] = [
-                    'id' => $currency->id,
-                    'title' => $currency->title,
-                    'symbol_left' => $currency->symbol_left,
-                    'symbol_right' => $currency->symbol_right,
-                    'decimal_place' => $currency->decimal_place,
-                    'value' => $currency->value,
-                    'decimal_point' => $currency->decimal_point,
+                    'id'             => $currency->id,
+                    'title'          => $currency->title,
+                    'symbol_left'    => $currency->symbol_left,
+                    'symbol_right'   => $currency->symbol_right,
+                    'decimal_place'  => $currency->decimal_place,
+                    'value'          => $currency->value,
+                    'decimal_point'  => $currency->decimal_point,
                     'thousand_point' => $currency->thousand_point,
-                    'code' => $currency->code,
+                    'code'           => $currency->code,
                 ];
             }
 
