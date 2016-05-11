@@ -99,7 +99,7 @@ class CurrencyUpdateCommand extends Command
                 $code = substr($line, 4, 3);
                 $value = substr($line, 11, 6);
                 if ($value)
-                    $this->updateOrCreateCurrency($code, $value);
+                    $this->updateCurrency($code, $value);
             }
 
             Cache::forget('casinelli.currency');
@@ -127,7 +127,7 @@ class CurrencyUpdateCommand extends Command
 
         // Update each rate
         foreach ($content->rates as $code => $value)
-            $this->updateOrCreateCurrency($code, $value);
+            $this->updateCurrency($code, $value);
 
         Cache::forget('casinelli.currency');
 
@@ -158,7 +158,7 @@ class CurrencyUpdateCommand extends Command
 
         //update the currency rates to database
         foreach ($rates as $code => $value)
-            $this->updateOrCreateCurrency($code, $value);
+            $this->updateCurrency($code, $value);
 
         Cache::forget('casinelli.currency');
 
@@ -203,6 +203,15 @@ class CurrencyUpdateCommand extends Command
     private function disableAll()
     {
         return Currency::query()->update(['status' => Currency::STATUS_DISABLED]);
+    }
+
+    private function updateCurrency($code, $value)
+    {
+        return Currency::where('code', $code)
+            ->update([
+                'value'  => $value,
+                'status' => Currency::STATUS_ENABLED,
+            ]);
     }
 
     private function updateOrCreateCurrency($code, $value)
