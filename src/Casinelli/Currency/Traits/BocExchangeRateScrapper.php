@@ -2,6 +2,7 @@
 
 namespace Casinelli\Currency\Traits;
 
+use Config;
 use Symfony\Component\DomCrawler\Crawler;
 
 trait BocExchangeRateScrapper
@@ -34,12 +35,12 @@ trait BocExchangeRateScrapper
         $rs = [];
 
         //all rates excepts for CNY
-        foreach ($xToCnyRates as $code => $toCnyRate) {
-            $rs[$code] = $defaultCurrencyToCnyRate / $xToCnyRates;
+        foreach ($xToCnyRates as $code => $xToCnyRate) {
+            $rs[$code] = $defaultCurrencyToCnyRate / $xToCnyRate;
         }
 
         //cny
-        $unit = config('currency.boc_unit');
+        $unit = Config::get('currency.boc_unit');
         $rs['CNY'] = $defaultCurrencyToCnyRate / $unit;
 
         return $rs;
