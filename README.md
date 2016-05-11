@@ -63,6 +63,12 @@ php artisan currency:update --openexchangerates
 
  > Note: An API key is needed to use [OpenExchangeRates.org](http://OpenExchangeRates.org). Add yours to the config file.
 
+To upate from Bank of China exchange rates webpage
+
+~~~
+php artisan currency:update --bocexchangerates
+~~~
+
 ### Cleanup
 
 Used to clean the Laravel cached exchanged rates and refresh it from the database. Note that cached exchanged rates are cleared after they are updated using one of the command above.

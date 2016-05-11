@@ -2,14 +2,16 @@
 
 namespace Casinelli\Currency\Commands;
 
+use Cache;
+use Casinelli\Currency\Entities\Currency;
+use Casinelli\Currency\Traits\BocExchangeRateScrapper;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Input\InputOption;
-use DB;
-use Cache;
-use DateTime;
 
 class CurrencyUpdateCommand extends Command
 {
+    use BocExchangeRateScrapper;
+
     /**
      * The console command name.
      *
@@ -27,27 +29,26 @@ class CurrencyUpdateCommand extends Command
     /**
      * Application instance.
      *
-     * @var Illuminate\Foundation\Application
+     * @var \Illuminate\Foundation\Application
      */
     protected $app;
 
     /**
-     * Currencies table name.
+     * HTTP Proxy.
      *
      * @var string
      */
-    protected $table_name;
+    protected $proxy;
 
     /**
      * Create a new command instance.
      *
-     * @param Illuminate\Foundation\Application $app
+     * @param $app \Illuminate\Foundation\Application
      */
     public function __construct($app)
     {
         $this->app = $app;
-        $this->table_name = $app['config']['currency.table_name'];
-
+        $this->proxy = $app['config']['currency.proxy'];
         parent::__construct();
     }
 
@@ -59,18 +60,17 @@ class CurrencyUpdateCommand extends Command
         // Get Settings
         $defaultCurrency = $this->app['config']['currency.default'];
 
-        if ($this->input->getOption('openexchangerates')) {
-            if (!$api = $this->app['config']['currency.api_key']) {
-                $this->error('An API key is needed from OpenExchangeRates.org to continue.');
-
-                return;
-            }
-
+        try {
             // Get rates
-            $this->updateFromOpenExchangeRates($defaultCurrency, $api);
-        } else {
-            // Get rates
-            $this->updateFromYahoo($defaultCurrency);
+            if ($this->input->getOption('openexchangerates'))
+                $this->updateFromOpenExchangeRates($defaultCurrency);
+            elseif ($this->input->getOption('bocexchangerates'))
+                $this->updateFromBocExchangeRates($defaultCurrency);
+            else
+                $this->updateFromYahoo($defaultCurrency);
+        }
+        catch (\Exception $e) {
+            $this->error($e->getMessage());
         }
     }
 
@@ -81,13 +81,17 @@ class CurrencyUpdateCommand extends Command
         $data = [];
 
         // Get all currencies
-        foreach ($this->app['db']->table($this->table_name)->get() as $currency) {
+        foreach (Currency::all() as $currency) {
             $data[] = "{$defaultCurrency}{$currency->code}=X";
         }
 
         // Ask Yahoo for exchange rate
         if ($data) {
-            $content = $this->request('http://download.finance.yahoo.com/d/quotes.csv?s='.implode(',', $data).'&f=sl1&e=.csv');
+            //disable all currencies
+            $this->disableAll();
+
+            //download the currency data
+            $content = $this->request('http://download.finance.yahoo.com/d/quotes.csv?s=' . implode(',', $data) . '&f=sl1&e=.csv');
 
             $lines = explode("\n", trim($content));
 
@@ -95,15 +99,8 @@ class CurrencyUpdateCommand extends Command
             foreach ($lines as $line) {
                 $code = substr($line, 4, 3);
                 $value = substr($line, 11, 6);
-
-                if ($value) {
-                    $this->app['db']->table($this->table_name)
-                        ->where('code', $code)
-                        ->update([
-                            'value' => $value,
-                            'updated_at' => new DateTime('now'),
-                        ]);
-                }
+                if ($value)
+                    $this->updateOrCreateCurrency($code, $value);
             }
 
             Cache::forget('casinelli.currency');
@@ -112,39 +109,64 @@ class CurrencyUpdateCommand extends Command
         $this->info('Update!');
     }
 
-    private function updateFromOpenExchangeRates($defaultCurrency, $api)
+    private function updateFromOpenExchangeRates($defaultCurrency)
     {
         $this->info('Updating currency exchange rates from OpenExchangeRates.org...');
+
+        if (!$api = $this->app['config']['currency.api_key'])
+            throw new \Exception('An API key is needed from OpenExchangeRates.org to continue.');
 
         // Make request
         $content = json_decode($this->request("http://openexchangerates.org/api/latest.json?base={$defaultCurrency}&app_id={$api}"));
 
         // Error getting content?
-        if (isset($content->error)) {
-            $this->error($content->description);
+        if (isset($content->error))
+            throw new \Exception($content->description);
 
-            return;
-        }
-
-        // Parse timestamp for DB
-        $timestamp = new DateTime(strtotime($content->timestamp));
+        //Disable all currencies
+        $this->disableAll();
 
         // Update each rate
-        foreach ($content->rates as $code => $value) {
-            $this->app['db']->table($this->table_name)
-                ->where('code', $code)
-                ->update([
-                    'value' => $value,
-                    'updated_at' => $timestamp,
-                ]);
-        }
+        foreach ($content->rates as $code => $value)
+            $this->updateOrCreateCurrency($code, $value);
 
         Cache::forget('casinelli.currency');
 
-        $this->info('Update!');
+        $this->info('Updated!');
     }
 
-    private function request($url)
+    private function updateFromBocExchangeRates($defaultCurrency)
+    {
+        $this->info('Updating currency exchange rates from Bank of China website...');
+
+        //load exchange rates webpage url from configuration file
+        $url = $this->app['config']['currency.boc_url'];
+
+        //make request
+        $html = $this->request($url);
+
+        //crawl the middle rates
+        $xToCnyRates = $this->retrieveMiddleRates($html);
+        if (!isset($xToCnyRates[$defaultCurrency]))
+            throw new \Exception('Default currency rate not found.');
+
+        //convert CNY based rates to USD based rates
+        $defaultCurrencyToCnyRate = $xToCnyRates[$defaultCurrency];
+        $rates = $this->convertToUsdRates($xToCnyRates, $defaultCurrencyToCnyRate);
+
+        //disable all currencies
+        $this->disableAll();
+
+        //update the currency rates to database
+        foreach ($rates as $code => $value)
+            $this->updateOrCreateCurrency($code, $value);
+
+        Cache::forget('casinelli.currency');
+
+        $this->info('Updated!');
+    }
+
+    private function request($url, $opts = [])
     {
         $ch = curl_init($url);
 
@@ -157,10 +179,44 @@ class CurrencyUpdateCommand extends Command
         curl_setopt($ch, CURLOPT_MAXCONNECTS, 2);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 
+        //proxy
+        if ($proxy = $this->proxy)
+            curl_setopt_array($ch, [
+                CURLOPT_PROXY           => $proxy,
+                CURLOPT_HTTPPROXYTUNNEL => 1,
+            ]);
+
+        //custom options
+        if ($opts)
+            curl_setopt_array($ch, $opts);
+
         $response = curl_exec($ch);
+        $error = $response ?: curl_error($ch);
         curl_close($ch);
 
+        if (!$response)
+            throw new \Exception($error);
+
         return $response;
+    }
+
+    private function disableAll()
+    {
+        return Currency::query()->update(['status' => Currency::STATUS_DISABLED]);
+    }
+
+    private function updateOrCreateCurrency($code, $value)
+    {
+        return Currency::updateOrCreate(
+            [
+                'code' => $code,
+            ],
+            [
+                'code'   => $code,
+                'value'  => $value,
+                'status' => Currency::STATUS_ENABLED,
+            ]
+        );
     }
 
     /**
@@ -172,6 +228,7 @@ class CurrencyUpdateCommand extends Command
     {
         return [
             ['openexchangerates', 'o', InputOption::VALUE_NONE, 'Get rates from OpenExchangeRates.org'],
+            ['bocexchangerates', 'b', InputOption::VALUE_NONE, 'Get rates from Bank of China website (www.boc.cn)'],
         ];
     }
 }
